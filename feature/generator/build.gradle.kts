@@ -25,6 +25,7 @@ dependencies {
     implementation(project(":core:model"))
     implementation(project(":core:qr"))
     implementation(project(":core:export"))
+    implementation(project(":core:style"))
     implementation(project(":core:designsystem"))
 
     val composeBom = platform(libs.compose.bom)

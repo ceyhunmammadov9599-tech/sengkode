@@ -16,6 +16,7 @@ rootProject.name = "sengkode"
 include(":app")
 include(":core:model")
 include(":core:qr")
+include(":core:style")
 include(":core:database")
 include(":core:export")
 include(":core:designsystem")

@@ -1,7 +1,7 @@
 package com.hjinlabs.sengkode.feature.generator
 
 import android.widget.Toast
-import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -22,26 +23,32 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import com.hjinlabs.sengkode.core.export.DrawListBitmapRenderer
 import com.hjinlabs.sengkode.core.export.QrFileExporter
 import com.hjinlabs.sengkode.core.model.EccLevel
 import com.hjinlabs.sengkode.core.model.ExportSpec
 import com.hjinlabs.sengkode.core.model.QrContent
 import com.hjinlabs.sengkode.core.model.QrGenerationResult
-import com.hjinlabs.sengkode.core.model.QrStyle
 import com.hjinlabs.sengkode.core.model.WifiEncryption
 import com.hjinlabs.sengkode.core.model.type
+import com.hjinlabs.sengkode.core.style.LogoImage
 import androidx.hilt.navigation.compose.hiltViewModel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -59,6 +66,24 @@ fun GeneratorScreen(
     val state by viewModel.state.collectAsStateWithLifecycle()
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
+    val renderer = remember { DrawListBitmapRenderer() }
+
+    // Logo pixels: a UI asset picked with the system photo picker
+    // (ACTION_OPEN_DOCUMENT - no storage permission, privacy intact).
+    var logoImage by remember { mutableStateOf<LogoImage?>(null) }
+    val logoPicker = rememberLauncherForActivityResult(
+        ActivityResultContracts.OpenDocument(),
+    ) { uri ->
+        if (uri != null) {
+            scope.launch {
+                logoImage = withContext(Dispatchers.IO) {
+                    context.contentResolver.openInputStream(uri)?.use { input ->
+                        android.graphics.BitmapFactory.decodeStream(input)
+                    }?.let { decodeLogoImage(it) }
+                }
+            }
+        }
+    }
 
     Column(
         modifier = Modifier
@@ -71,11 +96,25 @@ fun GeneratorScreen(
             viewModel.updateContent(defaultContentFor(type))
         })
 
+        QrPreview(state = state, renderer = renderer, logoImage = logoImage)
+
         ContentEditor(content = state.content, onContentChange = viewModel::updateContent)
 
         EccPicker(selected = state.ecc, onSelected = viewModel::updateEcc)
+        if (state.effectiveEcc != state.ecc) {
+            Text(
+                text = stringResource(R.string.ecc_effective, state.effectiveEcc.name),
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.primary,
+            )
+        }
 
-        QrPreview(state = state)
+        StyleSections(
+            style = state.style,
+            onStyleChange = { newStyle -> viewModel.setStyle(newStyle) },
+            onPickLogo = { logoPicker.launch(arrayOf("image/*")) },
+            logoPicked = logoImage != null,
+        )
 
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -83,18 +122,22 @@ fun GeneratorScreen(
         ) {
             Button(
                 onClick = {
-                    scope.launch { export(state, context, share = false) }
+                    scope.launch {
+                        export(state, context, renderer, logoImage, share = false)
+                    }
                 },
-                enabled = state.matrix != null,
+                enabled = state.canRender,
                 modifier = Modifier.weight(1f),
             ) {
                 Text(stringResource(R.string.action_save))
             }
             OutlinedButton(
                 onClick = {
-                    scope.launch { export(state, context, share = true) }
+                    scope.launch {
+                        export(state, context, renderer, logoImage, share = true)
+                    }
                 },
-                enabled = state.matrix != null,
+                enabled = state.canRender,
                 modifier = Modifier.weight(1f),
             ) {
                 Text(stringResource(R.string.action_share))
@@ -103,13 +146,54 @@ fun GeneratorScreen(
     }
 }
 
+/**
+ * Downsamples a picked logo to bounded pixels (<= 256px side): the
+ * render-side blit scales again, so huge inputs only cost memory.
+ */
+private fun decodeLogoImage(bitmap: android.graphics.Bitmap): LogoImage {
+    val maxSide = 256
+    val scaled = if (maxOf(bitmap.width, bitmap.height) > maxSide) {
+        val scale = maxSide.toFloat() / maxOf(bitmap.width, bitmap.height)
+        android.graphics.Bitmap.createScaledBitmap(
+            bitmap,
+            (bitmap.width * scale).toInt().coerceAtLeast(1),
+            (bitmap.height * scale).toInt().coerceAtLeast(1),
+            true,
+        )
+    } else {
+        bitmap
+    }
+    val pixels = IntArray(scaled.width * scaled.height)
+    scaled.getPixels(pixels, 0, scaled.width, 0, 0, scaled.width, scaled.height)
+    return LogoImage(pixels, scaled.width, scaled.height)
+}
+
 // ---------------------------------------------------------------------
 // Preview
 // ---------------------------------------------------------------------
 
+private const val PREVIEW_SIZE_PX = 512
+
 @Composable
-private fun QrPreview(state: StudioState) {
+private fun QrPreview(
+    state: StudioState,
+    renderer: DrawListBitmapRenderer,
+    logoImage: LogoImage?,
+) {
     val matrix = state.matrix
+    // Preview == export: the SAME backend renders the SAME ops, off
+    // the main thread; recomposition only happens on a new bitmap.
+    var preview by remember { mutableStateOf<android.graphics.Bitmap?>(null) }
+    LaunchedEffect(matrix, state.style, logoImage, state.safety) {
+        if (matrix == null || state.safety !is com.hjinlabs.sengkode.core.style.ScanSafety.Safe) {
+            preview = null
+            return@LaunchedEffect
+        }
+        preview = withContext(Dispatchers.Default) {
+            renderer.render(matrix, state.style, PREVIEW_SIZE_PX, logoImage)
+        }
+    }
+
     Surface(
         modifier = Modifier.fillMaxWidth(),
         shape = MaterialTheme.shapes.large,
@@ -120,14 +204,32 @@ private fun QrPreview(state: StudioState) {
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
+            val current = preview
             when {
-                matrix != null -> {
-                    QrMatrixPreview(
-                        matrix = matrix,
+                current != null -> {
+                    Image(
+                        bitmap = current.asImageBitmap(),
+                        contentDescription = stringResource(R.string.cd_qr_preview),
+                        contentScale = ContentScale.Fit,
                         modifier = Modifier
                             .fillMaxWidth(0.72f)
                             .aspectRatio(1f),
                     )
+                }
+                state.safety is com.hjinlabs.sengkode.core.style.ScanSafety.Unsafe -> {
+                    Text(
+                        text = stringResource(R.string.preview_unsafe_title),
+                        style = MaterialTheme.typography.titleSmall,
+                        color = MaterialTheme.colorScheme.error,
+                    )
+                    (state.safety as com.hjinlabs.sengkode.core.style.ScanSafety.Unsafe)
+                        .reasons.forEach { reason ->
+                            Text(
+                                text = reason,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.error,
+                            )
+                        }
                 }
                 state.error != null -> {
                     Text(
@@ -141,39 +243,6 @@ private fun QrPreview(state: StudioState) {
                         text = stringResource(R.string.preview_empty),
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-            }
-        }
-    }
-}
-
-/**
- * Renders the pure matrix with Compose Canvas. Drawing is driven by the
- * [QrGenerationResult] identity, so recomposition happens only when a
- * NEW matrix arrives - not on unrelated state changes.
- */
-@Composable
-private fun QrMatrixPreview(
-    matrix: com.hjinlabs.sengkode.core.model.QrMatrix,
-    modifier: Modifier = Modifier,
-    foreground: Color = Color.Black,
-    background: Color = Color.White,
-    quietZone: Int = QrStyle.DEFAULT_QUIET_ZONE,
-) {
-    Canvas(modifier = modifier) {
-        drawRect(background)
-        val total = matrix.width + 2 * quietZone
-        val cell = size.minDimension / total
-        val origin = Offset(cell * quietZone, cell * quietZone)
-        for (y in 0 until matrix.height) {
-            val rowBase = y * matrix.width
-            for (x in 0 until matrix.width) {
-                if (matrix.bits[rowBase + x]) {
-                    drawRect(
-                        color = foreground,
-                        topLeft = origin + Offset(x * cell, y * cell),
-                        size = androidx.compose.ui.geometry.Size(cell, cell),
                     )
                 }
             }
@@ -426,13 +495,20 @@ private fun defaultContentFor(type: com.hjinlabs.sengkode.core.model.QrContentTy
 // Export actions
 // ---------------------------------------------------------------------
 
-private suspend fun export(state: StudioState, context: android.content.Context, share: Boolean) {
+private suspend fun export(
+    state: StudioState,
+    context: android.content.Context,
+    renderer: DrawListBitmapRenderer,
+    logoImage: LogoImage?,
+    share: Boolean,
+) {
     val success = state.result as? QrGenerationResult.Success ?: return
-    val renderer = com.hjinlabs.sengkode.core.export.QrBitmapRenderer()
+    // Unsafe styles are never exported - the same gate the preview uses.
+    if (state.safety !is com.hjinlabs.sengkode.core.style.ScanSafety.Safe) return
     val exporter = QrFileExporter(context)
     val spec = ExportSpec(displayName = "sengkode-${System.currentTimeMillis()}")
     val bitmap = withContext(Dispatchers.Default) {
-        renderer.render(success.matrix, QrStyle(), spec.sizePx)
+        renderer.render(success.matrix, state.style, spec.sizePx, logoImage)
     }
     if (share) {
         exporter.sharePng(bitmap, spec)

@@ -1,12 +1,14 @@
 package com.hjinlabs.sengkode.core.model
 
 /**
- * Visual configuration for rendering a QR matrix.
+ * Visual configuration for rendering a QR matrix. The Phase 1 fields
+ * keep their defaults; the Phase 2 fields default to the classic
+ * appearance, so existing call sites behave identically.
  *
- * Phase 1 scope: only the essentials the renderer needs (module and
- * background colors, quiet-zone size). The full customization studio
- * (shapes, logos, frames) is a Phase 2 deliverable and will EXTEND this
- * class; the rendering contract (matrix in -> bitmap out) stays stable.
+ * Styling operates exclusively on RENDERING - the encoded matrix is
+ * never modified for visual effects. The final scannability authority
+ * is always the generate -> render -> decode round trip, not this
+ * style object.
  */
 data class QrStyle(
     /** ARGB color of the dark modules. */
@@ -15,7 +17,21 @@ data class QrStyle(
     val backgroundArgb: Long = 0xFFFFFFFFL,
     /** Quiet-zone width in module units (spec minimum: 4). */
     val quietZoneModules: Int = DEFAULT_QUIET_ZONE,
+    /** Data-module rendering shape. */
+    val moduleShape: ModuleShape = ModuleShape.SQUARE,
+    /** Finder-pattern rendering shape. */
+    val eyeShape: EyeShape = EyeShape.SQUARE,
+    /** Finder color; null follows [foregroundArgb]. */
+    val eyeColorArgb: Long? = null,
+    /** Center logo; null disables the logo. */
+    val logo: LogoSpec? = null,
+    /** Frame; null disables the frame. */
+    val frame: FrameSpec? = null,
 ) {
+    /** Effective finder color (explicit or the module color). */
+    val effectiveEyeColorArgb: Long
+        get() = eyeColorArgb ?: foregroundArgb
+
     companion object {
         const val DEFAULT_QUIET_ZONE = 4
     }

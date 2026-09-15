@@ -19,6 +19,7 @@ android {
 
 dependencies {
     api(project(":core:model"))
+    api(project(":core:style"))
     implementation(libs.core.ktx)
     // Phase 1 pipeline (Bitmap/PNG/MediaStore/FileProvider) is plain
     // android.graphics - no Compose dependency by design, so the export

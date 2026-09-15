@@ -22,6 +22,7 @@
     <string name="encryption_nopass">Open (no password)</string>
     <string name="ecc_label">Error correction</string>
     <string name="preview_empty">Enter content to generate a QR code</string>
+    <string name="preview_unsafe_title">This style is not scannable</string>
     <string name="action_save">Save to gallery</string>
     <string name="action_share">Share</string>
     <string name="saved_to_gallery">Saved to gallery</string>
@@ -35,4 +36,23 @@
     <string name="type_sms">SMS</string>
     <string name="type_phone">Phone</string>
     <string name="type_geo">Location</string>
+    <string name="section_colors">Colors</string>
+    <string name="section_shape">Modules</string>
+    <string name="section_eyes">Eyes</string>
+    <string name="section_logo">Logo</string>
+    <string name="section_frame">Frame</string>
+    <string name="color_custom_fg">Custom foreground (hex RRGGBB)</string>
+    <string name="color_custom_bg">Custom background (hex RRGGBB)</string>
+    <string name="color_invalid_hex">Enter a 6-digit hex color</string>
+    <string name="eye_color_same">Match modules</string>
+    <string name="eye_color_custom">Custom (hex RRGGBB)</string>
+    <string name="logo_enable">Enable center logo</string>
+    <string name="logo_pick">Choose image</string>
+    <string name="logo_remove">Remove image</string>
+    <string name="logo_size">Logo size: %1$d%%</string>
+    <string name="logo_too_large">The logo is too large for this code size</string>
+    <string name="frame_enable">SCAN ME frame</string>
+    <string name="ecc_effective">Using ECC %1$s (auto-upgraded for the logo)</string>
+    <string name="cd_color_preset">Color preset %1$s</string>
+    <string name="cd_qr_preview">QR code preview</string>
 </resources>

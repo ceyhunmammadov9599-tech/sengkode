@@ -104,4 +104,101 @@ class StudioViewModelTest {
             (viewModel.state.value.result as QrGenerationResult.Success).payload,
         )
     }
+
+    // ---- Phase 2: style, scan safety, logo ECC -------------------------
+
+private class EccSpy(private val real: QrEngine) : QrEngine {
+    val usedEcc = mutableListOf<EccLevel>()
+    override fun generate(content: QrContent, ecc: EccLevel): QrGenerationResult {
+        usedEcc.add(ecc)
+        return real.generate(content, ecc)
+    }
+}
+
+@Test
+fun `style change regenerates`() = runTest {
+    val spy = EccSpy(engine)
+    val viewModel = StudioViewModel(spy, UnconfinedTestDispatcher())
+    viewModel.updateContent(QrContent.Text("styled"))
+    advanceTimeBy(StudioViewModel.GENERATION_DEBOUNCE_MS + 1)
+    assertEquals(1, spy.usedEcc.size)
+
+    viewModel.updateStyle { it.copy(eyeShape = com.hjinlabs.sengkode.core.model.EyeShape.ROUNDED) }
+    advanceTimeBy(StudioViewModel.GENERATION_DEBOUNCE_MS + 1)
+    assertEquals(2, spy.usedEcc.size)
+}
+
+@Test
+fun `logo upgrades effective ecc for generation`() = runTest {
+    val spy = EccSpy(engine)
+    val viewModel = StudioViewModel(spy, UnconfinedTestDispatcher())
+    viewModel.updateContent(QrContent.Text("logo ecc upgrade 0123456789"))
+    advanceTimeBy(StudioViewModel.GENERATION_DEBOUNCE_MS + 1)
+    assertEquals(EccLevel.M, spy.usedEcc.last())
+
+    viewModel.updateStyle {
+        it.copy(logo = com.hjinlabs.sengkode.core.model.LogoSpec(sizeFraction = 0.20f))
+    }
+    advanceTimeBy(StudioViewModel.GENERATION_DEBOUNCE_MS + 1)
+    // 20% logo -> H; user's M is kept as a floor, never lowered.
+    assertEquals(EccLevel.H, spy.usedEcc.last())
+    assertEquals(EccLevel.H, viewModel.state.value.effectiveEcc)
+}
+
+@Test
+fun `user ecc choice is a floor - logo never lowers it`() = runTest {
+    val spy = EccSpy(engine)
+    val viewModel = StudioViewModel(spy, UnconfinedTestDispatcher())
+    viewModel.updateContent(QrContent.Text("floor ecc"))
+    viewModel.updateEcc(EccLevel.Q)
+    advanceTimeBy(StudioViewModel.GENERATION_DEBOUNCE_MS + 1)
+    viewModel.updateStyle {
+        it.copy(logo = com.hjinlabs.sengkode.core.model.LogoSpec(sizeFraction = 0.12f))
+    }
+    advanceTimeBy(StudioViewModel.GENERATION_DEBOUNCE_MS + 1)
+    assertEquals(EccLevel.Q, spy.usedEcc.last())
+}
+
+@Test
+fun `unsafe style blocks rendering but generation still succeeds`() = runTest {
+    val viewModel = vm()
+    viewModel.updateContent(QrContent.Text("unsafe style"))
+    advanceTimeBy(StudioViewModel.GENERATION_DEBOUNCE_MS + 1)
+    viewModel.updateStyle {
+        it.copy(
+            foregroundArgb = 0xFFFFFFFFL,
+            backgroundArgb = 0xFF000000L,
+        )
+    }
+    val state = viewModel.state.value
+    // Matrix exists (generation is style-independent), but rendering
+    // is gated: inverted colors are never silently shown or exported.
+    assertTrue(state.matrix != null)
+    assertTrue(state.safety is com.hjinlabs.sengkode.core.style.ScanSafety.Unsafe)
+    assertEquals(false, state.canRender)
+}
+
+@Test
+fun `quiet zone violation is reported unsafe`() = runTest {
+    val viewModel = vm()
+    viewModel.updateContent(QrContent.Text("quiet zone"))
+    advanceTimeBy(StudioViewModel.GENERATION_DEBOUNCE_MS + 1)
+    viewModel.updateStyle { it.copy(quietZoneModules = 2) }
+    assertTrue(
+        viewModel.state.value.safety is com.hjinlabs.sengkode.core.style.ScanSafety.Unsafe,
+    )
+}
+
+@Test
+fun `safe style reports safe and allows rendering`() = runTest {
+    val viewModel = vm()
+    viewModel.updateContent(QrContent.Text("safe style"))
+    advanceTimeBy(StudioViewModel.GENERATION_DEBOUNCE_MS + 1)
+    viewModel.updateStyle {
+        it.copy(moduleShape = com.hjinlabs.sengkode.core.model.ModuleShape.DOT)
+    }
+    val state = viewModel.state.value
+    assertTrue(state.safety is com.hjinlabs.sengkode.core.style.ScanSafety.Safe)
+    assertEquals(true, state.canRender)
+}
 }
