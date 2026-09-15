@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">SENGKODE</string>
+    <string name="tab_generator">Create</string>
+    <string name="tab_history">History</string>
+    <string name="tab_templates">Templates</string>
+</resources>
