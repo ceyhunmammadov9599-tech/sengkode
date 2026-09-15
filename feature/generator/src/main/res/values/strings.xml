@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="field_text">Text</string>
+    <string name="field_url">Web address</string>
+    <string name="field_wifi_ssid">Network name (SSID)</string>
+    <string name="field_wifi_password">Password</string>
+    <string name="field_wifi_hidden">Hidden network</string>
+    <string name="field_name">Name</string>
+    <string name="field_organization">Organization</string>
+    <string name="field_phone">Phone number</string>
+    <string name="field_email">Email address</string>
+    <string name="field_website">Website</string>
+    <string name="field_note">Note</string>
+    <string name="field_subject">Subject</string>
+    <string name="field_body">Message</string>
+    <string name="field_sms_number">Phone number</string>
+    <string name="field_sms_message">Message (optional)</string>
+    <string name="field_latitude">Latitude (-90 to 90)</string>
+    <string name="field_longitude">Longitude (-180 to 180)</string>
+    <string name="encryption_wpa">WPA/WPA2/WPA3</string>
+    <string name="encryption_wep">WEP</string>
+    <string name="encryption_nopass">Open (no password)</string>
+    <string name="ecc_label">Error correction</string>
+    <string name="preview_empty">Enter content to generate a QR code</string>
+    <string name="action_save">Save to gallery</string>
+    <string name="action_share">Share</string>
+    <string name="saved_to_gallery">Saved to gallery</string>
+    <string name="saved_to_app_storage">Saved to app storage (available to file managers)</string>
+    <string name="save_failed">Save failed</string>
+    <string name="type_text">Text</string>
+    <string name="type_url">URL</string>
+    <string name="type_wifi">Wi-Fi</string>
+    <string name="type_vcard">Contact</string>
+    <string name="type_email">Email</string>
+    <string name="type_sms">SMS</string>
+    <string name="type_phone">Phone</string>
+    <string name="type_geo">Location</string>
+</resources>

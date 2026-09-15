@@ -1,0 +1,32 @@
+package com.hjinlabs.sengkode.feature.generator.di
+
+import com.hjinlabs.sengkode.core.export.QrBitmapRenderer
+import com.hjinlabs.sengkode.core.qr.QrEngine
+import com.hjinlabs.sengkode.core.qr.ZxingQrEngine
+import dagger.Module
+import dagger.Provides
+import dagger.hilt.InstallIn
+import dagger.hilt.components.SingletonComponent
+import javax.inject.Singleton
+import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.Dispatchers
+
+/**
+ * Engine bindings live at the consumer boundary so :core:qr stays a
+ * pure JVM module with zero dependency-injection awareness.
+ */
+@Module
+@InstallIn(SingletonComponent::class)
+object GeneratorModule {
+
+    @Provides
+    @Singleton
+    fun provideQrEngine(): QrEngine = ZxingQrEngine()
+
+    @Provides
+    @Singleton
+    fun provideQrBitmapRenderer(): QrBitmapRenderer = QrBitmapRenderer()
+
+    @Provides
+    fun provideGenerationDispatcher(): CoroutineDispatcher = Dispatchers.Default
+}

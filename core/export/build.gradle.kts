@@ -1,7 +1,6 @@
 plugins {
     alias(libs.plugins.android.library)
     alias(libs.plugins.kotlin.android)
-    alias(libs.plugins.kotlin.compose)
 }
 
 android {
@@ -16,12 +15,15 @@ android {
         targetCompatibility = JavaVersion.VERSION_17
     }
     kotlinOptions { jvmTarget = "17" }
-    buildFeatures { compose = true }
 }
 
 dependencies {
     api(project(":core:model"))
-    val composeBom = platform(libs.compose.bom)
-    implementation(composeBom)
+    implementation(libs.core.ktx)
+    // Phase 1 pipeline (Bitmap/PNG/MediaStore/FileProvider) is plain
+    // android.graphics - no Compose dependency by design, so the export
+    // pipeline is reusable from any surface (UI, batch, future headless
+    // mode). The Compose render seam, if ever needed, is a Phase 4
+    // decision documented in the Technical Validation Report.
     testImplementation(libs.junit)
 }

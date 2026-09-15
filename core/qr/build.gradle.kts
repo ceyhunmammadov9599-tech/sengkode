@@ -8,8 +8,9 @@ kotlin {
 
 dependencies {
     api(project(":core:model"))
-    // Pinned in Phase 0 (validated pin-set); wired in Phase 1 when the
-    // encoder surface exists - no speculative dependency usage.
+    // ZXing core: pure-Java artifact, no Android/network surface.
+    // Its QRCodeReader is used by the round-trip scannability tests.
+    implementation(libs.zxing.core)
     testImplementation(libs.junit)
     testImplementation(libs.coroutines.test)
 }
