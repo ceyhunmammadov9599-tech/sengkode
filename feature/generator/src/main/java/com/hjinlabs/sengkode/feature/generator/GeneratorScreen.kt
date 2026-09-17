@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FilterChip
@@ -22,6 +23,7 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -67,6 +69,23 @@ fun GeneratorScreen(
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val renderer = remember { DrawListBitmapRenderer() }
+
+    // Session handoffs (history regenerate, template apply) land here:
+    // consume exactly once on entering composition.
+    LaunchedEffect(Unit) { viewModel.consumeRestore() }
+
+    LaunchedEffect(Unit) {
+        viewModel.events.collect { event ->
+            when (event) {
+                StudioEvent.SavedToHistory ->
+                    Toast.makeText(context, R.string.saved_to_history, Toast.LENGTH_SHORT).show()
+                StudioEvent.SavedAsTemplate ->
+                    Toast.makeText(context, R.string.saved_as_template, Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
+
+    var showTemplateDialog by remember { mutableStateOf(false) }
 
     // Logo pixels: a UI asset picked with the system photo picker
     // (ACTION_OPEN_DOCUMENT - no storage permission, privacy intact).
@@ -120,6 +139,22 @@ fun GeneratorScreen(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(12.dp),
         ) {
+            OutlinedButton(
+                onClick = { viewModel.saveToHistory() },
+                enabled = state.matrix != null,
+                modifier = Modifier.weight(1f),
+            ) {
+                Text(stringResource(R.string.action_save_history))
+            }
+            TextButton(onClick = { showTemplateDialog = true }) {
+                Text(stringResource(R.string.action_save_template))
+            }
+        }
+
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
             Button(
                 onClick = {
                     scope.launch {
@@ -142,6 +177,37 @@ fun GeneratorScreen(
             ) {
                 Text(stringResource(R.string.action_share))
             }
+        }
+
+        if (showTemplateDialog) {
+            var templateName by remember { mutableStateOf("") }
+            AlertDialog(
+                onDismissRequest = { showTemplateDialog = false },
+                title = { Text(stringResource(R.string.action_save_template)) },
+                text = {
+                    OutlinedTextField(
+                        value = templateName,
+                        onValueChange = { templateName = it },
+                        label = { Text(stringResource(R.string.template_name_hint)) },
+                        singleLine = true,
+                    )
+                },
+                confirmButton = {
+                    TextButton(
+                        onClick = {
+                            showTemplateDialog = false
+                            viewModel.saveAsTemplate(templateName)
+                        },
+                    ) {
+                        Text(stringResource(R.string.template_save_cta))
+                    }
+                },
+                dismissButton = {
+                    TextButton(onClick = { showTemplateDialog = false }) {
+                        Text(stringResource(R.string.action_cancel))
+                    }
+                },
+            )
         }
     }
 }

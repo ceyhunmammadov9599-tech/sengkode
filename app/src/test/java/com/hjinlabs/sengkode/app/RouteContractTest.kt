@@ -16,7 +16,12 @@ class RouteContractTest {
 
     @Test
     fun `routes round-trip through serialization`() {
-        val routes = listOf(GeneratorRoute, HistoryRoute, TemplatesRoute)
+        val routes = listOf(
+            GeneratorRoute,
+            HistoryRoute,
+            HistoryDetailRoute(itemId = 42L),
+            TemplatesRoute,
+        )
         assertTrue(routes.all { route -> roundTrip(route) == route })
     }
 
@@ -33,6 +38,7 @@ class RouteContractTest {
             .map { it::class.qualifiedName }
         assertTrue(names.none { it.isNullOrBlank() })
         assertEquals(3, names.toSet().size)
+        assertTrue(HistoryDetailRoute::class.qualifiedName != HistoryRoute::class.qualifiedName)
     }
 
     // -- helpers -----------------------------------------------------------
@@ -40,11 +46,16 @@ class RouteContractTest {
     private fun encode(route: Any): String = when (route) {
         is GeneratorRoute -> Json.encodeToString(serializer<GeneratorRoute>(), route)
         is HistoryRoute -> Json.encodeToString(serializer<HistoryRoute>(), route)
+        is HistoryDetailRoute -> Json.encodeToString(
+            serializer<HistoryDetailRoute>(), route,
+        )
         is TemplatesRoute -> Json.encodeToString(serializer<TemplatesRoute>(), route)
         else -> error("Unknown route type: $route")
     }
 
     private fun decode(routeType: String, payload: String): Any = when (routeType) {
+        HistoryDetailRoute::class.qualifiedName!! ->
+            Json.decodeFromString(serializer<HistoryDetailRoute>(), payload)
         GeneratorRoute::class.qualifiedName!! ->
             Json.decodeFromString(serializer<GeneratorRoute>(), payload)
         HistoryRoute::class.qualifiedName!! ->

@@ -1,5 +1,7 @@
 package com.hjinlabs.sengkode.core.model
 
+import kotlinx.serialization.Serializable
+
 /**
  * Visual configuration for rendering a QR matrix. The Phase 1 fields
  * keep their defaults; the Phase 2 fields default to the classic
@@ -10,6 +12,7 @@ package com.hjinlabs.sengkode.core.model
  * is always the generate -> render -> decode round trip, not this
  * style object.
  */
+@Serializable
 data class QrStyle(
     /** ARGB color of the dark modules. */
     val foregroundArgb: Long = 0xFF000000L,
@@ -38,6 +41,7 @@ data class QrStyle(
 }
 
 /** QR error-correction levels. Default across the app is [M]. */
+@Serializable
 enum class EccLevel {
     L, M, Q, H;
 

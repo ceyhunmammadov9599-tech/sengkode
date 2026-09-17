@@ -2,6 +2,7 @@ package com.hjinlabs.sengkode.feature.generator
 
 import com.hjinlabs.sengkode.core.model.EccLevel
 import com.hjinlabs.sengkode.core.model.QrContent
+import com.hjinlabs.sengkode.core.model.QrStyle
 import com.hjinlabs.sengkode.core.model.QrError
 import com.hjinlabs.sengkode.core.model.QrGenerationResult
 import com.hjinlabs.sengkode.core.model.WifiEncryption
@@ -38,7 +39,13 @@ class StudioViewModelTest {
     }
 
     private fun vm(spy: QrEngine? = null): StudioViewModel =
-        StudioViewModel(spy ?: engine, UnconfinedTestDispatcher())
+        StudioViewModel(
+            spy ?: engine,
+            FakeHistoryRepository(),
+            FakeTemplateRepository(),
+            RecordingRestoreStore(),
+            UnconfinedTestDispatcher(),
+        )
 
     @Test
     fun `valid content produces a matrix after the debounce`() = runTest {
@@ -107,6 +114,52 @@ class StudioViewModelTest {
 
     // ---- Phase 2: style, scan safety, logo ECC -------------------------
 
+// ---- Phase 3: history/template integration fakes --------------------
+
+private class FakeHistoryRepository : com.hjinlabs.sengkode.core.model.repository.HistoryRepository {
+    val saved = mutableListOf<Triple<QrContent, QrStyle, String>>()
+    private val flow = kotlinx.coroutines.flow.MutableStateFlow(
+        emptyList<com.hjinlabs.sengkode.core.model.repository.HistoryItem>(),
+    )
+    override fun observeAll(): kotlinx.coroutines.flow.Flow<List<com.hjinlabs.sengkode.core.model.repository.HistoryItem>> = flow
+    override suspend fun get(id: Long) = flow.value.firstOrNull { it.id == id }
+    override suspend fun save(content: QrContent, style: QrStyle, title: String): Long {
+        saved.add(Triple(content, style, title))
+        return saved.size.toLong()
+    }
+    override suspend fun setFavorite(id: Long, favorite: Boolean) = Unit
+    override suspend fun delete(id: Long) = Unit
+    override suspend fun clearAll() = Unit
+}
+
+private class FakeTemplateRepository :
+    com.hjinlabs.sengkode.core.model.repository.TemplateRepository {
+    val custom = mutableListOf<String>()
+    override fun observeAll(): kotlinx.coroutines.flow.Flow<List<com.hjinlabs.sengkode.core.model.repository.TemplateRecord>> =
+        kotlinx.coroutines.flow.flowOf(emptyList())
+    override suspend fun ensureSeeded() = Unit
+    override suspend fun saveCustom(
+        name: String,
+        description: String,
+        style: QrStyle,
+        contentTypeHint: com.hjinlabs.sengkode.core.model.QrContentType,
+    ): Long {
+        custom.add(name)
+        return custom.size.toLong()
+    }
+    override suspend fun deleteCustom(id: Long) = Unit
+}
+
+class RecordingRestoreStore : com.hjinlabs.sengkode.core.model.repository.StudioRestoreStore {
+    private var pair: Pair<QrContent, QrStyle>? = null
+    val puts = mutableListOf<Pair<QrContent, QrStyle>>()
+    override fun put(content: QrContent, style: QrStyle) {
+        pair = content to style
+        puts.add(pair!!)
+    }
+    override fun consume(): Pair<QrContent, QrStyle>? = pair.also { pair = null }
+}
+
 private class EccSpy(private val real: QrEngine) : QrEngine {
     val usedEcc = mutableListOf<EccLevel>()
     override fun generate(content: QrContent, ecc: EccLevel): QrGenerationResult {
@@ -118,7 +171,13 @@ private class EccSpy(private val real: QrEngine) : QrEngine {
 @Test
 fun `style change regenerates`() = runTest {
     val spy = EccSpy(engine)
-    val viewModel = StudioViewModel(spy, UnconfinedTestDispatcher())
+    val viewModel = StudioViewModel(
+            spy,
+            FakeHistoryRepository(),
+            FakeTemplateRepository(),
+            RecordingRestoreStore(),
+            UnconfinedTestDispatcher(),
+        )
     viewModel.updateContent(QrContent.Text("styled"))
     advanceTimeBy(StudioViewModel.GENERATION_DEBOUNCE_MS + 1)
     assertEquals(1, spy.usedEcc.size)
@@ -131,7 +190,13 @@ fun `style change regenerates`() = runTest {
 @Test
 fun `logo upgrades effective ecc for generation`() = runTest {
     val spy = EccSpy(engine)
-    val viewModel = StudioViewModel(spy, UnconfinedTestDispatcher())
+    val viewModel = StudioViewModel(
+            spy,
+            FakeHistoryRepository(),
+            FakeTemplateRepository(),
+            RecordingRestoreStore(),
+            UnconfinedTestDispatcher(),
+        )
     viewModel.updateContent(QrContent.Text("logo ecc upgrade 0123456789"))
     advanceTimeBy(StudioViewModel.GENERATION_DEBOUNCE_MS + 1)
     assertEquals(EccLevel.M, spy.usedEcc.last())
@@ -148,7 +213,13 @@ fun `logo upgrades effective ecc for generation`() = runTest {
 @Test
 fun `user ecc choice is a floor - logo never lowers it`() = runTest {
     val spy = EccSpy(engine)
-    val viewModel = StudioViewModel(spy, UnconfinedTestDispatcher())
+    val viewModel = StudioViewModel(
+            spy,
+            FakeHistoryRepository(),
+            FakeTemplateRepository(),
+            RecordingRestoreStore(),
+            UnconfinedTestDispatcher(),
+        )
     viewModel.updateContent(QrContent.Text("floor ecc"))
     viewModel.updateEcc(EccLevel.Q)
     advanceTimeBy(StudioViewModel.GENERATION_DEBOUNCE_MS + 1)
@@ -201,4 +272,94 @@ fun `safe style reports safe and allows rendering`() = runTest {
     assertTrue(state.safety is com.hjinlabs.sengkode.core.style.ScanSafety.Safe)
     assertEquals(true, state.canRender)
 }
+
+    // ---- Phase 3: restore + persistence actions --------------------
+
+    @Test
+    fun `consumeRestore applies a pending history or template pair`() = runTest {
+        val store = RecordingRestoreStore()
+        val viewModel = StudioViewModel(
+            engine, FakeHistoryRepository(), FakeTemplateRepository(), store,
+            UnconfinedTestDispatcher(),
+        )
+        val content = QrContent.Text("restored from history")
+        val style = QrStyle(
+            moduleShape = com.hjinlabs.sengkode.core.model.ModuleShape.DOT,
+        )
+        store.put(content, style)
+
+        viewModel.consumeRestore()
+        advanceTimeBy(StudioViewModel.GENERATION_DEBOUNCE_MS + 1)
+
+        val state = viewModel.state.value
+        assertEquals(content, state.content)
+        assertEquals(style, state.style)
+    }
+
+    @Test
+    fun `consumeRestore with nothing pending is a no-op`() = runTest {
+        val store = RecordingRestoreStore()
+        val viewModel = StudioViewModel(
+            engine, FakeHistoryRepository(), FakeTemplateRepository(), store,
+            UnconfinedTestDispatcher(),
+        )
+        viewModel.updateContent(QrContent.Text("mine"))
+        advanceTimeBy(StudioViewModel.GENERATION_DEBOUNCE_MS + 1)
+
+        viewModel.consumeRestore()
+        val state = viewModel.state.value
+        assertEquals(QrContent.Text("mine"), state.content)
+    }
+
+    @Test
+    fun `saveToHistory snapshots the current content and style`() = runTest {
+        val repo = FakeHistoryRepository()
+        val viewModel = StudioViewModel(
+            engine, repo, FakeTemplateRepository(), RecordingRestoreStore(),
+            UnconfinedTestDispatcher(),
+        )
+        val content = QrContent.Wifi("Net", "pw", com.hjinlabs.sengkode.core.model.WifiEncryption.WPA, false)
+        viewModel.updateContent(content)
+        advanceTimeBy(StudioViewModel.GENERATION_DEBOUNCE_MS + 1)
+
+        viewModel.saveToHistory()
+        advanceTimeBy(50)
+
+        assertEquals(1, repo.saved.size)
+        assertEquals(content, repo.saved[0].first)
+        assertEquals(QrStyle(), repo.saved[0].second)
+        assertEquals("Wi-Fi Net", repo.saved[0].third)
+    }
+
+    @Test
+    fun `saveAsTemplate persists the current style with content type`() = runTest {
+        val templates = FakeTemplateRepository()
+        val viewModel = StudioViewModel(
+            engine, FakeHistoryRepository(), templates, RecordingRestoreStore(),
+            UnconfinedTestDispatcher(),
+        )
+        viewModel.updateContent(QrContent.Url("https://hjinlabs.app"))
+        advanceTimeBy(StudioViewModel.GENERATION_DEBOUNCE_MS + 1)
+
+        viewModel.saveAsTemplate("")
+        advanceTimeBy(50)
+
+        assertEquals(listOf("My style"), templates.custom)
+    }
+
+    @Test
+    fun `restore events are delivered`() = runTest {
+        val store = RecordingRestoreStore()
+        val viewModel = StudioViewModel(
+            engine, FakeHistoryRepository(), FakeTemplateRepository(), store,
+            UnconfinedTestDispatcher(),
+        )
+        store.put(QrContent.Text("x"), QrStyle())
+        viewModel.consumeRestore()
+        // consume exactly once: a second consume must be a no-op.
+        store.put(QrContent.Text("y"), QrStyle())
+        store.consume() // consumed outside the VM, like a second session
+        viewModel.consumeRestore()
+        assertEquals(QrContent.Text("x"), viewModel.state.value.content)
+    }
 }

@@ -55,4 +55,11 @@
     <string name="ecc_effective">Using ECC %1$s (auto-upgraded for the logo)</string>
     <string name="cd_color_preset">Color preset %1$s</string>
     <string name="cd_qr_preview">QR code preview</string>
+    <string name="action_save_history">Save to history</string>
+    <string name="action_save_template">Save style as template</string>
+    <string name="template_name_hint">Template name</string>
+    <string name="template_save_cta">Save template</string>
+    <string name="saved_to_history">Saved to history</string>
+    <string name="saved_as_template">Template saved</string>
+    <string name="action_cancel">Cancel</string>
 </resources>

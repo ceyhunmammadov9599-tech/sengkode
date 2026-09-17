@@ -15,8 +15,8 @@ android {
         applicationId = "com.hjinlabs.sengkode"
         minSdk = 24
         targetSdk = 34
-        versionCode = 3
-        versionName = "0.3.0-phase2"
+        versionCode = 4
+        versionName = "0.4.0-phase3"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 

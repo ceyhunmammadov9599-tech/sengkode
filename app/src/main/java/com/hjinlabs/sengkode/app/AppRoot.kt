@@ -16,11 +16,13 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.navigation.NavDestination.Companion.hierarchy
 import androidx.navigation.NavGraph.Companion.findStartDestination
+import androidx.navigation.toRoute
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.hjinlabs.sengkode.feature.generator.GeneratorScreen
+import com.hjinlabs.sengkode.feature.history.HistoryDetailScreen
 import com.hjinlabs.sengkode.feature.history.HistoryScreen
 import com.hjinlabs.sengkode.feature.templates.TemplatesScreen
 
@@ -77,8 +79,38 @@ fun AppRoot(modifier: Modifier = Modifier) {
             modifier = Modifier.padding(innerPadding),
         ) {
             composable<GeneratorRoute> { GeneratorScreen() }
-            composable<HistoryRoute> { HistoryScreen() }
-            composable<TemplatesRoute> { TemplatesScreen() }
+            composable<HistoryRoute> {
+                HistoryScreen(
+                    onOpenDetail = { id -> navController.navigate(HistoryDetailRoute(id)) },
+                )
+            }
+            composable<HistoryDetailRoute> { entry ->
+                HistoryDetailScreen(
+                    onBack = { navController.popBackStack() },
+                    onRegenerate = {
+                        navController.navigate(GeneratorRoute) {
+                            popUpTo(navController.graph.findStartDestination().id) {
+                                saveState = true
+                            }
+                            launchSingleTop = true
+                            restoreState = true
+                        }
+                    },
+                )
+            }
+            composable<TemplatesRoute> {
+                TemplatesScreen(
+                    onApply = {
+                        navController.navigate(GeneratorRoute) {
+                            popUpTo(navController.graph.findStartDestination().id) {
+                                saveState = true
+                            }
+                            launchSingleTop = true
+                            restoreState = true
+                        }
+                    },
+                )
+            }
         }
     }
 }

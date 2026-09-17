@@ -3,6 +3,7 @@ package com.hjinlabs.sengkode.feature.generator.di
 import com.hjinlabs.sengkode.core.export.QrBitmapRenderer
 import com.hjinlabs.sengkode.core.qr.QrEngine
 import com.hjinlabs.sengkode.core.qr.ZxingQrEngine
+import dagger.Binds
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -29,4 +30,18 @@ object GeneratorModule {
 
     @Provides
     fun provideGenerationDispatcher(): CoroutineDispatcher = Dispatchers.Default
+}
+
+/**
+ * Session restore handoff binding (history/templates -> studio).
+ */
+@Module
+@InstallIn(SingletonComponent::class)
+abstract class RestoreStoreModule {
+
+    @Binds
+    @Singleton
+    abstract fun bindRestoreStore(
+        impl: com.hjinlabs.sengkode.feature.generator.InMemoryStudioRestoreStore,
+    ): com.hjinlabs.sengkode.core.model.repository.StudioRestoreStore
 }

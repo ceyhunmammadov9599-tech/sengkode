@@ -1,22 +1,28 @@
 package com.hjinlabs.sengkode.core.model
 
+import kotlinx.serialization.Serializable
+
 /**
  * Domain content types supported by the v1 engine. Immutable, pure
  * Kotlin, no Android dependencies. Each variant is produced by the UI
  * editors and consumed exclusively by the :core:qr engine.
  */
+@Serializable
 sealed interface QrContent {
 
     /** Plain free text. */
+    @Serializable
     data class Text(val text: String) : QrContent
 
     /** Web URL; the encoder normalizes missing schemes. */
+    @Serializable
     data class Url(val url: String) : QrContent
 
     /**
      * Wi-Fi join configuration per the WIFI: de-facto specification.
      * [password] must be empty for [WifiEncryption.NOPASS].
      */
+    @Serializable
     data class Wifi(
         val ssid: String,
         val password: String,
@@ -25,6 +31,7 @@ sealed interface QrContent {
     ) : QrContent
 
     /** Contact card (vCard 3.0). [fullName] is required. */
+    @Serializable
     data class VCard(
         val fullName: String,
         val organization: String?,
@@ -35,6 +42,7 @@ sealed interface QrContent {
     ) : QrContent
 
     /** Email with optional subject and body. */
+    @Serializable
     data class Email(
         val address: String,
         val subject: String?,
@@ -42,17 +50,22 @@ sealed interface QrContent {
     ) : QrContent
 
     /** SMS with optional pre-filled message. */
+    @Serializable
     data class Sms(val number: String, val message: String?) : QrContent
 
     /** Phone number for a dial action. */
+    @Serializable
     data class Phone(val number: String) : QrContent
 
     /** Geographic coordinates. */
+    @Serializable
     data class Geo(val latitude: Double, val longitude: Double) : QrContent
 }
 
+@Serializable
 enum class WifiEncryption { WPA, WEP, NOPASS }
 
+@Serializable
 enum class QrContentType {
     TEXT, URL, WIFI, VCARD, EMAIL, SMS, PHONE, GEO
 }

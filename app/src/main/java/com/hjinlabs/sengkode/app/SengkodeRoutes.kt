@@ -15,4 +15,7 @@ data object GeneratorRoute
 data object HistoryRoute
 
 @Serializable
+data class HistoryDetailRoute(val itemId: Long)
+
+@Serializable
 data object TemplatesRoute

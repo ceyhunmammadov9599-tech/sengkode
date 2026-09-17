@@ -1,5 +1,7 @@
 package com.hjinlabs.sengkode.core.model
 
+import kotlinx.serialization.Serializable
+
 /**
  * Phase 2 customization spec types. Pure Kotlin, immutable, additive to
  * the Phase 1 model - every field has a default that reproduces the
@@ -7,9 +9,11 @@ package com.hjinlabs.sengkode.core.model
  */
 
 /** Data-module rendering shapes. */
+@Serializable
 enum class ModuleShape { SQUARE, ROUNDED, DOT }
 
 /** Finder-pattern ("eye") rendering shapes. */
+@Serializable
 enum class EyeShape { SQUARE, ROUNDED }
 
 /**
@@ -20,6 +24,7 @@ enum class EyeShape { SQUARE, ROUNDED }
  * The actual logo PIXELS are a render-time input (see :core:style
  * LogoImage) - bitmaps do not belong in the domain model.
  */
+@Serializable
 data class LogoSpec(val sizeFraction: Float = DEFAULT_FRACTION) {
     companion object {
         const val DEFAULT_FRACTION = 0.18f
@@ -29,6 +34,7 @@ data class LogoSpec(val sizeFraction: Float = DEFAULT_FRACTION) {
 }
 
 /** High-quality frame presets; frames live OUTSIDE the symbol. */
+@Serializable
 enum class FrameStyle { BORDER }
 
 /**
@@ -36,6 +42,7 @@ enum class FrameStyle { BORDER }
  * (quiet zone included) and never covers it, reduces the scan area,
  * or modifies modules.
  */
+@Serializable
 data class FrameSpec(
     val style: FrameStyle = FrameStyle.BORDER,
     val labelText: String = DEFAULT_LABEL,

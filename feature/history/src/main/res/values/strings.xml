@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="history_title">History</string>
+    <string name="history_empty">Nothing saved yet. Codes you save appear here.</string>
+    <string name="history_clear_all">Clear history</string>
+    <string name="history_clear_confirm_title">Clear all history?</string>
+    <string name="history_clear_confirm_text">All saved codes and styles will be deleted from this device. This cannot be undone.</string>
+    <string name="action_cancel">Cancel</string>
+    <string name="action_delete">Delete</string>
+    <string name="action_regenerate">Regenerate</string>
+    <string name="detail_title">Saved code</string>
+    <string name="cd_favorite_toggle">Toggle favorite</string>
+    <string name="cd_delete_item">Delete from history</string>
+    <string name="saved_to_history">Saved to history</string>
+    <string name="history_regenerated">Loaded back into the studio</string>
+</resources>

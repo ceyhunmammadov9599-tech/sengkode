@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="templates_title">Templates</string>
+    <string name="templates_empty">No templates yet.</string>
+    <string name="template_apply">Apply</string>
+    <string name="template_custom_badge">Custom</string>
+    <string name="cd_template_preview">Template style preview</string>
+    <string name="cd_delete_item_template">Delete template</string>
+</resources>
