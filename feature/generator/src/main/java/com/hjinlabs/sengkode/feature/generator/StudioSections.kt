@@ -43,6 +43,7 @@ internal fun StyleSections(
     style: QrStyle,
     onStyleChange: (QrStyle) -> Unit,
     onPickLogo: () -> Unit,
+    onRemoveLogoImage: () -> Unit,
     logoPicked: Boolean,
 ) {
     SectionCard(stringResource(R.string.section_colors)) {
@@ -55,7 +56,7 @@ internal fun StyleSections(
         EyeSection(style, onStyleChange)
     }
     SectionCard(stringResource(R.string.section_logo)) {
-        LogoSection(style, onStyleChange, onPickLogo, logoPicked)
+        LogoSection(style, onStyleChange, onPickLogo, onRemoveLogoImage, logoPicked)
     }
     SectionCard(stringResource(R.string.section_frame)) {
         FrameSection(style, onStyleChange)
@@ -214,6 +215,7 @@ private fun LogoSection(
     style: QrStyle,
     onStyleChange: (QrStyle) -> Unit,
     onPickLogo: () -> Unit,
+    onRemoveLogoImage: () -> Unit,
     logoPicked: Boolean,
 ) {
     Row(
@@ -231,15 +233,23 @@ private fun LogoSection(
     }
     if (style.logo != null) {
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            AssistChip(
+                onClick = onPickLogo,
+                label = {
+                    Text(
+                        stringResource(
+                            if (logoPicked) R.string.logo_pick_change else R.string.logo_pick,
+                        ),
+                    )
+                },
+            )
             if (logoPicked) {
                 AssistChip(
-                    onClick = onPickLogo,
-                    label = { Text(stringResource(R.string.logo_pick)) },
-                )
-            } else {
-                AssistChip(
-                    onClick = onPickLogo,
-                    label = { Text(stringResource(R.string.logo_pick)) },
+                    onClick = {
+                        onRemoveLogoImage()
+                        onStyleChange(style.copy(logo = null))
+                    },
+                    label = { Text(stringResource(R.string.logo_remove_image)) },
                 )
             }
         }
@@ -250,6 +260,7 @@ private fun LogoSection(
             ),
             style = MaterialTheme.typography.labelLarge,
         )
+        val sizeLabel = stringResource(R.string.logo_size_cd)
         Slider(
             value = style.logo!!.sizeFraction,
             onValueChange = { fraction ->
@@ -258,6 +269,7 @@ private fun LogoSection(
                 )
             },
             valueRange = LogoSpec.MIN_FRACTION..LogoSpec.MAX_FRACTION,
+            modifier = Modifier.semantics { contentDescription = sizeLabel },
         )
     }
 }

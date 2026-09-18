@@ -1,6 +1,7 @@
 package com.hjinlabs.sengkode.feature.history
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.aspectRatio
@@ -19,6 +20,15 @@ import androidx.compose.material.icons.outlined.FavoriteBorder
 import androidx.compose.material.icons.outlined.QrCode2
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material.icons.outlined.MoreVert
+import android.widget.Toast
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.runtime.rememberCoroutineScope
+import kotlinx.coroutines.launch
+import java.io.File
+import kotlinx.coroutines.Dispatchers as UiDispatchers
 import androidx.compose.material3.Card
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -43,10 +53,14 @@ import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.hjinlabs.sengkode.core.export.BatchPngExporter
 import com.hjinlabs.sengkode.core.export.DrawListBitmapRenderer
+import com.hjinlabs.sengkode.core.export.QrFileExporter
 import com.hjinlabs.sengkode.core.model.repository.HistoryItem
 import com.hjinlabs.sengkode.core.qr.ZxingQrEngine
 import com.hjinlabs.sengkode.core.model.EccLevel
@@ -70,11 +84,45 @@ fun HistoryScreen(
 ) {
     val items by viewModel.items.collectAsStateWithLifecycle()
     var confirmClear by remember { mutableStateOf(false) }
+    var batchMenuOpen by remember { mutableStateOf(false) }
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    val engine = remember { ZxingQrEngine() }
+    val renderer = remember { DrawListBitmapRenderer() }
+
+    fun runBatchExport(list: List<HistoryItem>) {
+        if (list.isEmpty()) {
+            Toast.makeText(context, R.string.batch_none, Toast.LENGTH_SHORT).show()
+            return
+        }
+        scope.launch {
+            val dir = File(context.cacheDir, "exports").apply { mkdirs() }
+            val file = dir.resolve("sengkode-batch-${System.currentTimeMillis()}.zip")
+            val result = BatchPngExporter(engine, renderer)
+                .exportToZip(list.map { it.content to it.style }, file.outputStream())
+            val message = context.getString(R.string.batch_exported, result.exportedCount) +
+                if (result.skipped.isNotEmpty()) {
+                    context.getString(R.string.batch_skipped, result.skipped.size)
+                } else {
+                    ""
+                }
+            Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
+            QrFileExporter(context).shareZip(file)
+        }
+    }
 
     Scaffold(
         modifier = modifier,
         topBar = {
-            HistoryTopBar(onClearAll = { confirmClear = true }, hasItems = items.isNotEmpty())
+            HistoryTopBar(
+                onClearAll = { confirmClear = true },
+                hasItems = items.isNotEmpty(),
+                onExportAll = { runBatchExport(items) },
+                onExportFavorites = {
+                    runBatchExport(items.filter { it.isFavorite })
+                },
+                hasFavorites = items.any { it.isFavorite },
+            )
         },
     ) { padding ->
         if (items.isEmpty()) {
@@ -135,11 +183,39 @@ fun HistoryScreen(
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun HistoryTopBar(onClearAll: () -> Unit, hasItems: Boolean) {
+private fun HistoryTopBar(
+    onClearAll: () -> Unit,
+    hasItems: Boolean,
+    onExportAll: () -> Unit,
+    onExportFavorites: () -> Unit,
+    hasFavorites: Boolean,
+) {
+    val menuLabel = stringResource(R.string.cd_batch_menu)
+    var menuOpen by remember { mutableStateOf(false) }
     TopAppBar(
         title = { Text(stringResource(R.string.history_title)) },
         actions = {
             if (hasItems) {
+                Box {
+                    IconButton(
+                        onClick = { menuOpen = true },
+                        modifier = Modifier.semantics { contentDescription = menuLabel },
+                    ) {
+                        Icon(Icons.Outlined.MoreVert, contentDescription = null)
+                    }
+                    DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
+                        DropdownMenuItem(
+                            text = { Text(stringResource(R.string.batch_export_all)) },
+                            onClick = { menuOpen = false; onExportAll() },
+                        )
+                        if (hasFavorites) {
+                            DropdownMenuItem(
+                                text = { Text(stringResource(R.string.batch_export_favorites)) },
+                                onClick = { menuOpen = false; onExportFavorites() },
+                            )
+                        }
+                    }
+                }
                 IconButton(onClick = onClearAll) {
                     Icon(
                         Icons.Outlined.DeleteSweep,
@@ -283,7 +359,7 @@ fun HistoryDetailScreen(
                 preview?.let { bitmap ->
                     androidx.compose.foundation.Image(
                         bitmap = bitmap.asImageBitmap(),
-                        contentDescription = null,
+                        contentDescription = stringResource(R.string.cd_saved_preview),
                         modifier = Modifier
                             .fillMaxWidth(0.72f)
                             .aspectRatio(1f)

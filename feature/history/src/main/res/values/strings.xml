@@ -13,4 +13,11 @@
     <string name="cd_delete_item">Delete from history</string>
     <string name="saved_to_history">Saved to history</string>
     <string name="history_regenerated">Loaded back into the studio</string>
+    <string name="batch_export_all">Export all as ZIP</string>
+    <string name="batch_export_favorites">Export favorites as ZIP</string>
+    <string name="batch_exported">Exported %1$d codes</string>
+    <string name="batch_skipped">, %1$d skipped (unsafe style)</string>
+    <string name="batch_none">Nothing to export</string>
+    <string name="cd_batch_menu">More actions</string>
+    <string name="cd_saved_preview">Saved QR code preview</string>
 </resources>

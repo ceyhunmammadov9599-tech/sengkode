@@ -32,6 +32,9 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.liveRegion
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.asImageBitmap
@@ -42,6 +45,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import com.hjinlabs.sengkode.core.export.BitmapScannabilityVerifier
 import com.hjinlabs.sengkode.core.export.DrawListBitmapRenderer
 import com.hjinlabs.sengkode.core.export.QrFileExporter
 import com.hjinlabs.sengkode.core.model.EccLevel
@@ -90,6 +94,11 @@ fun GeneratorScreen(
     // Logo pixels: a UI asset picked with the system photo picker
     // (ACTION_OPEN_DOCUMENT - no storage permission, privacy intact).
     var logoImage by remember { mutableStateOf<LogoImage?>(null) }
+
+    // Phase 4 runtime scannability gate: when a logo is actually
+    // placed, decode the rendered result and require the EXACT
+    // payload - the on-device round-trip. null = not applicable.
+    var logoVerified by remember { mutableStateOf<Boolean?>(null) }
     val logoPicker = rememberLauncherForActivityResult(
         ActivityResultContracts.OpenDocument(),
     ) { uri ->
@@ -100,6 +109,23 @@ fun GeneratorScreen(
                         android.graphics.BitmapFactory.decodeStream(input)
                     }?.let { decodeLogoImage(it) }
                 }
+            }
+        }
+    }
+
+    LaunchedEffect(state.matrix, state.style, logoImage) {
+        val matrix = state.matrix
+        val success = state.result as? QrGenerationResult.Success
+        if (matrix == null || success == null || logoImage == null) {
+            logoVerified = null
+            return@LaunchedEffect
+        }
+        logoVerified = withContext(Dispatchers.Default) {
+            val bitmap = renderer.render(matrix, state.style, 512, logoImage)
+            try {
+                BitmapScannabilityVerifier.isScannable(bitmap, success.payload)
+            } finally {
+                bitmap.recycle()
             }
         }
     }
@@ -116,6 +142,21 @@ fun GeneratorScreen(
         })
 
         QrPreview(state = state, renderer = renderer, logoImage = logoImage)
+        if (logoImage != null && logoVerified != null) {
+            Text(
+                text = stringResource(
+                    if (logoVerified == true) R.string.logo_verified
+                    else R.string.logo_unverified,
+                ),
+                style = MaterialTheme.typography.labelLarge,
+                color = if (logoVerified == true) {
+                    MaterialTheme.colorScheme.primary
+                } else {
+                    MaterialTheme.colorScheme.error
+                },
+                modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite },
+            )
+        }
 
         ContentEditor(content = state.content, onContentChange = viewModel::updateContent)
 
@@ -132,6 +173,7 @@ fun GeneratorScreen(
             style = state.style,
             onStyleChange = { newStyle -> viewModel.setStyle(newStyle) },
             onPickLogo = { logoPicker.launch(arrayOf("image/*")) },
+            onRemoveLogoImage = { logoImage = null },
             logoPicked = logoImage != null,
         )
 
@@ -158,7 +200,7 @@ fun GeneratorScreen(
             Button(
                 onClick = {
                     scope.launch {
-                        export(state, context, renderer, logoImage, share = false)
+                        export(state, context, renderer, logoImage, logoVerified, share = false)
                     }
                 },
                 enabled = state.canRender,
@@ -169,7 +211,7 @@ fun GeneratorScreen(
             OutlinedButton(
                 onClick = {
                     scope.launch {
-                        export(state, context, renderer, logoImage, share = true)
+                        export(state, context, renderer, logoImage, logoVerified, share = true)
                     }
                 },
                 enabled = state.canRender,
@@ -566,11 +608,19 @@ private suspend fun export(
     context: android.content.Context,
     renderer: DrawListBitmapRenderer,
     logoImage: LogoImage?,
+    logoVerified: Boolean?,
     share: Boolean,
 ) {
     val success = state.result as? QrGenerationResult.Success ?: return
     // Unsafe styles are never exported - the same gate the preview uses.
     if (state.safety !is com.hjinlabs.sengkode.core.style.ScanSafety.Safe) return
+    // Phase 4: a logo that breaks decoding blocks the export too.
+    if (logoImage != null && logoVerified == false) {
+        withContext(Dispatchers.Main) {
+            Toast.makeText(context, R.string.logo_unverified, Toast.LENGTH_SHORT).show()
+        }
+        return
+    }
     val exporter = QrFileExporter(context)
     val spec = ExportSpec(displayName = "sengkode-${System.currentTimeMillis()}")
     val bitmap = withContext(Dispatchers.Default) {

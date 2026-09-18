@@ -21,6 +21,14 @@
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
+            <!-- Phase 4 share-into-app: receive plain text/URL shares.
+                 No permission involved; the payload flows through the
+                 studio's normal validation and safety pipeline. -->
+            <intent-filter>
+                <action android:name="android.intent.action.SEND" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:mimeType="text/plain" />
+            </intent-filter>
         </activity>
 
         <!-- Export/share workflow: narrow, per-export read grants only

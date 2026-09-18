@@ -70,6 +70,22 @@ class QrFileExporter(private val context: Context) {
 
     // -- internals -------------------------------------------------------
 
+    /**
+     * Phase 4 batch workflow: share a finished ZIP through the same
+     * narrow FileProvider grant pattern as single PNGs.
+     */
+    fun shareZip(file: File) {
+        val uri = FileProvider.getUriForFile(context, appAuthority, file)
+        val send = Intent(Intent.ACTION_SEND).apply {
+            type = "application/zip"
+            putExtra(Intent.EXTRA_STREAM, uri)
+            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        }
+        context.startActivity(
+            Intent.createChooser(send, null).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+        )
+    }
+
     private fun insertIntoMediaStore(file: File, spec: ExportSpec): Uri {
         val values = ContentValues().apply {
             put(MediaStore_DISPLAY_NAME, "${spec.displayName}.png")

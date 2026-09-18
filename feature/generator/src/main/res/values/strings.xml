@@ -62,4 +62,11 @@
     <string name="saved_to_history">Saved to history</string>
     <string name="saved_as_template">Template saved</string>
     <string name="action_cancel">Cancel</string>
+    <string name="logo_pick_change">Change image</string>
+    <string name="logo_remove_image">Remove image</string>
+    <string name="logo_verified">Verified scannable</string>
+    <string name="logo_unverified">Logo blocks scanning - shrink or remove it</string>
+    <string name="logo_size_cd">Logo size</string>
+    <string name="preview_cd">QR code preview</string>
+    <string name="preview_unsafe_cd">QR preview unavailable: style is unsafe</string>
 </resources>
