@@ -69,4 +69,13 @@
     <string name="logo_size_cd">Logo size</string>
     <string name="preview_cd">QR code preview</string>
     <string name="preview_unsafe_cd">QR preview unavailable: style is unsafe</string>
+    <string name="section_customize">Customize appearance</string>
+    <string name="state_expanded">expanded</string>
+    <string name="state_collapsed">collapsed</string>
+    <string name="state_selected">selected</string>
+    <string name="state_unselected">not selected</string>
+    <string name="color_custom_open">Custom colors</string>
+    <string name="color_dialog_title">Custom colors</string>
+    <string name="color_dialog_hint">Unscannable combinations are blocked automatically.</string>
+    <string name="action_done">Done</string>
 </resources>

@@ -9,13 +9,18 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
+import androidx.compose.material3.SegmentedButton
+import androidx.compose.material3.SegmentedButtonDefaults
+import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
@@ -137,10 +142,6 @@ fun GeneratorScreen(
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
-        TypePicker(selected = state.content.type, onSelected = { type ->
-            viewModel.updateContent(defaultContentFor(type))
-        })
-
         QrPreview(state = state, renderer = renderer, logoImage = logoImage)
         if (logoImage != null && logoVerified != null) {
             Text(
@@ -157,6 +158,10 @@ fun GeneratorScreen(
                 modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite },
             )
         }
+
+        TypePicker(selected = state.content.type, onSelected = { type ->
+            viewModel.updateContent(defaultContentFor(type))
+        })
 
         ContentEditor(content = state.content, onContentChange = viewModel::updateContent)
 
@@ -181,22 +186,6 @@ fun GeneratorScreen(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            OutlinedButton(
-                onClick = { viewModel.saveToHistory() },
-                enabled = state.matrix != null,
-                modifier = Modifier.weight(1f),
-            ) {
-                Text(stringResource(R.string.action_save_history))
-            }
-            TextButton(onClick = { showTemplateDialog = true }) {
-                Text(stringResource(R.string.action_save_template))
-            }
-        }
-
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
-        ) {
             Button(
                 onClick = {
                     scope.launch {
@@ -208,7 +197,7 @@ fun GeneratorScreen(
             ) {
                 Text(stringResource(R.string.action_save))
             }
-            OutlinedButton(
+            androidx.compose.material3.FilledTonalButton(
                 onClick = {
                     scope.launch {
                         export(state, context, renderer, logoImage, logoVerified, share = true)
@@ -218,6 +207,25 @@ fun GeneratorScreen(
                 modifier = Modifier.weight(1f),
             ) {
                 Text(stringResource(R.string.action_share))
+            }
+        }
+
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            androidx.compose.material3.OutlinedButton(
+                onClick = { viewModel.saveToHistory() },
+                enabled = state.matrix != null,
+                modifier = Modifier.weight(1f),
+            ) {
+                Text(stringResource(R.string.action_save_history))
+            }
+            androidx.compose.material3.OutlinedButton(
+                onClick = { showTemplateDialog = true },
+                modifier = Modifier.weight(1f),
+            ) {
+                Text(stringResource(R.string.action_save_template))
             }
         }
 
@@ -303,7 +311,14 @@ private fun QrPreview(
     }
 
     Surface(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier
+            .fillMaxWidth()
+            .widthIn(max = 360.dp)
+            .border(
+                width = 1.dp,
+                color = MaterialTheme.colorScheme.outlineVariant,
+                shape = MaterialTheme.shapes.large,
+            ),
         shape = MaterialTheme.shapes.large,
         tonalElevation = 2.dp,
     ) {
@@ -321,6 +336,7 @@ private fun QrPreview(
                         contentScale = ContentScale.Fit,
                         modifier = Modifier
                             .fillMaxWidth(0.72f)
+                            .widthIn(max = 300.dp)
                             .aspectRatio(1f),
                     )
                 }
@@ -379,23 +395,25 @@ private fun TypePicker(
     }
 }
 
-@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun EccPicker(selected: EccLevel, onSelected: (EccLevel) -> Unit) {
-    FlowRow(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-    ) {
-        Text(
-            text = stringResource(R.string.ecc_label),
-            style = MaterialTheme.typography.labelLarge,
-        )
-        EccLevel.entries.forEach { level ->
-            FilterChip(
+    Text(
+        text = stringResource(R.string.ecc_label),
+        style = MaterialTheme.typography.labelLarge,
+        modifier = Modifier.padding(bottom = 8.dp),
+    )
+    SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
+        EccLevel.entries.forEachIndexed { index, level ->
+            SegmentedButton(
                 selected = level == selected,
                 onClick = { onSelected(level) },
-                label = { Text(level.name) },
-            )
+                shape = SegmentedButtonDefaults.itemShape(
+                    index = index,
+                    count = EccLevel.entries.size,
+                ),
+            ) {
+                Text(level.name)
+            }
         }
     }
 }
