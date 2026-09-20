@@ -1,3 +1,5 @@
+import java.util.Properties
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
@@ -29,6 +31,22 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
+            // Phase 5 release signing: credentials live ONLY in an
+            // uncommitted keystore.properties file (gitignored, see
+            // docs/RELEASE_SIGNING.md). No secrets in VCS, no insecure
+            // defaults; without the file the build stays unsigned.
+            val keystoreProps = Properties()
+            val keystoreFile = rootProject.file("keystore.properties")
+            if (keystoreFile.exists()) {
+                keystoreFile.inputStream().use { stream -> keystoreProps.load(stream) }
+                val releaseSigning = signingConfigs.create("release") {
+                    storeFile = file(keystoreProps.getProperty("storeFile"))
+                    storePassword = keystoreProps.getProperty("storePassword")
+                    keyAlias = keystoreProps.getProperty("keyAlias")
+                    keyPassword = keystoreProps.getProperty("keyPassword")
+                }
+                signingConfig = releaseSigning
+            }
         }
         debug {
             applicationIdSuffix = ".debug"
