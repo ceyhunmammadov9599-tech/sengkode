@@ -20,6 +20,7 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.minimumInteractiveComponentSize
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.SegmentedButton
 import androidx.compose.material3.SegmentedButtonDefaults
@@ -121,6 +122,7 @@ private fun ExpandableHeader(
         modifier = Modifier
             .fillMaxWidth()
             .clickable(onClick = onToggle)
+            .minimumInteractiveComponentSize()
             .semantics(mergeDescendants = true) {
                 role = Role.Button
                 stateDescription = if (expanded) expandedText else collapsedText
@@ -151,6 +153,7 @@ private fun ExpandableRow(
             modifier = Modifier
                 .fillMaxWidth()
                 .clickable(onClick = { expanded = !expanded })
+                .minimumInteractiveComponentSize()
                 .semantics(mergeDescendants = true) {
                     role = Role.Button
                     stateDescription = if (expanded) expandedText else collapsedText
@@ -203,6 +206,7 @@ private fun ColorSection(style: QrStyle, onStyleChange: (QrStyle) -> Unit) {
             Box(
                 modifier = Modifier
                     .size(44.dp)
+                    .minimumInteractiveComponentSize()
                     .semantics(mergeDescendants = true) {
                         contentDescription = label
                         stateDescription = stateText

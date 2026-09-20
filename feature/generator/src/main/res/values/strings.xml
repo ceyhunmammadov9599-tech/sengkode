@@ -50,7 +50,6 @@
     <string name="logo_pick">Choose image</string>
     <string name="logo_remove">Remove image</string>
     <string name="logo_size">Logo size: %1$d%%</string>
-    <string name="logo_too_large">The logo is too large for this code size</string>
     <string name="frame_enable">SCAN ME frame</string>
     <string name="ecc_effective">Using ECC %1$s (auto-upgraded for the logo)</string>
     <string name="cd_color_preset">Color preset %1$s</string>
@@ -67,8 +66,6 @@
     <string name="logo_verified">Verified scannable</string>
     <string name="logo_unverified">Logo blocks scanning - shrink or remove it</string>
     <string name="logo_size_cd">Logo size</string>
-    <string name="preview_cd">QR code preview</string>
-    <string name="preview_unsafe_cd">QR preview unavailable: style is unsafe</string>
     <string name="section_customize">Customize appearance</string>
     <string name="state_expanded">expanded</string>
     <string name="state_collapsed">collapsed</string>
