@@ -82,7 +82,6 @@ fun HistoryScreen(
 ) {
     val items by viewModel.items.collectAsStateWithLifecycle()
     var confirmClear by remember { mutableStateOf(false) }
-    var batchMenuOpen by remember { mutableStateOf(false) }
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val engine = remember { ZxingQrEngine() }
