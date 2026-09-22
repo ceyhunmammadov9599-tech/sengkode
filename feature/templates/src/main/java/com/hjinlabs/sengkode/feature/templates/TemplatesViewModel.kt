@@ -2,11 +2,13 @@ package com.hjinlabs.sengkode.feature.templates
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.hjinlabs.sengkode.core.export.DrawListBitmapRenderer
 import com.hjinlabs.sengkode.core.model.QrContent
 import com.hjinlabs.sengkode.core.model.QrContentDefaults
 import com.hjinlabs.sengkode.core.model.repository.StudioRestoreStore
 import com.hjinlabs.sengkode.core.model.repository.TemplateRecord
 import com.hjinlabs.sengkode.core.model.repository.TemplateRepository
+import com.hjinlabs.sengkode.core.qr.QrEngine
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
 import kotlinx.coroutines.flow.SharingStarted
@@ -24,6 +26,8 @@ import kotlinx.coroutines.launch
 class TemplatesViewModel @Inject constructor(
     private val repository: TemplateRepository,
     private val restoreStore: StudioRestoreStore,
+    val engine: QrEngine,
+    val renderer: DrawListBitmapRenderer,
 ) : ViewModel() {
 
     val templates: StateFlow<List<TemplateRecord>> = repository.observeAll()

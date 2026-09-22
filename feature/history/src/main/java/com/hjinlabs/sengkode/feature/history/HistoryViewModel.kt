@@ -3,9 +3,11 @@ package com.hjinlabs.sengkode.feature.history
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.hjinlabs.sengkode.core.export.DrawListBitmapRenderer
 import com.hjinlabs.sengkode.core.model.repository.HistoryItem
 import com.hjinlabs.sengkode.core.model.repository.HistoryRepository
 import com.hjinlabs.sengkode.core.model.repository.StudioRestoreStore
+import com.hjinlabs.sengkode.core.qr.QrEngine
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -25,6 +27,8 @@ class HistoryViewModel @Inject constructor(
     private val repository: HistoryRepository,
     private val restoreStore: StudioRestoreStore,
     savedStateHandle: SavedStateHandle,
+    val engine: QrEngine,
+    val renderer: DrawListBitmapRenderer,
 ) : ViewModel() {
 
     val items: StateFlow<List<HistoryItem>> = repository.observeAll()

@@ -60,7 +60,7 @@ import com.hjinlabs.sengkode.core.export.BatchPngExporter
 import com.hjinlabs.sengkode.core.export.DrawListBitmapRenderer
 import com.hjinlabs.sengkode.core.export.QrFileExporter
 import com.hjinlabs.sengkode.core.model.repository.HistoryItem
-import com.hjinlabs.sengkode.core.qr.ZxingQrEngine
+import com.hjinlabs.sengkode.core.qr.QrEngine
 import com.hjinlabs.sengkode.core.model.EccLevel
 import com.hjinlabs.sengkode.core.model.QrGenerationResult
 import com.hjinlabs.sengkode.core.model.type
@@ -84,8 +84,8 @@ fun HistoryScreen(
     var confirmClear by remember { mutableStateOf(false) }
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
-    val engine = remember { ZxingQrEngine() }
-    val renderer = remember { DrawListBitmapRenderer() }
+    val engine = viewModel.engine
+    val renderer = viewModel.renderer
 
     fun runBatchExport(list: List<HistoryItem>) {
         if (list.isEmpty()) {
@@ -297,8 +297,8 @@ fun HistoryDetailScreen(
     viewModel: HistoryViewModel = hiltViewModel(),
 ) {
     val item by viewModel.detail.collectAsStateWithLifecycle()
-    val engine = remember { ZxingQrEngine() }
-    val renderer = remember { DrawListBitmapRenderer() }
+    val engine = viewModel.engine
+    val renderer = viewModel.renderer
 
     var preview by remember { mutableStateOf<android.graphics.Bitmap?>(null) }
     LaunchedEffect(item) {
