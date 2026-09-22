@@ -41,7 +41,7 @@ import com.hjinlabs.sengkode.core.model.EccLevel
 import com.hjinlabs.sengkode.core.model.QrContent
 import com.hjinlabs.sengkode.core.model.QrContentDefaults
 import com.hjinlabs.sengkode.core.model.QrGenerationResult
-import com.hjinlabs.sengkode.core.qr.ZxingQrEngine
+import com.hjinlabs.sengkode.core.qr.QrEngine
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
@@ -79,6 +79,8 @@ fun TemplatesScreen(
                     description = template.description,
                     style = template.style,
                     isBuiltIn = template.isBuiltIn,
+                    engine = viewModel.engine,
+                    renderer = viewModel.renderer,
                     onApply = { onApply(viewModel.apply(template)) },
                     onDelete = if (template.isBuiltIn) null else { { viewModel.deleteCustom(template) } },
                 )
@@ -93,11 +95,11 @@ private fun TemplateCard(
     description: String,
     style: com.hjinlabs.sengkode.core.model.QrStyle,
     isBuiltIn: Boolean,
+    engine: QrEngine,
+    renderer: DrawListBitmapRenderer,
     onApply: () -> Unit,
     onDelete: (() -> Unit)?,
 ) {
-    val engine = remember { ZxingQrEngine() }
-    val renderer = remember { DrawListBitmapRenderer() }
     var preview by remember(style) { mutableStateOf<android.graphics.Bitmap?>(null) }
 
     LaunchedEffect(style) {

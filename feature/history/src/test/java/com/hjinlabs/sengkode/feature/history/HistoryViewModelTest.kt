@@ -1,7 +1,10 @@
 package com.hjinlabs.sengkode.feature.history
 
 import androidx.lifecycle.SavedStateHandle
+import com.hjinlabs.sengkode.core.export.DrawListBitmapRenderer
+import com.hjinlabs.sengkode.core.model.EccLevel
 import com.hjinlabs.sengkode.core.model.QrContent
+import com.hjinlabs.sengkode.core.model.QrGenerationResult
 import com.hjinlabs.sengkode.core.model.QrStyle
 import com.hjinlabs.sengkode.core.model.WifiEncryption
 import com.hjinlabs.sengkode.core.model.repository.HistoryItem
@@ -10,6 +13,7 @@ import com.hjinlabs.sengkode.core.model.repository.StudioRestoreStore
 import com.hjinlabs.sengkode.core.model.repository.TemplateRecord
 import com.hjinlabs.sengkode.core.model.repository.TemplateRepository
 import com.hjinlabs.sengkode.core.model.QrContentType
+import com.hjinlabs.sengkode.core.qr.QrEngine
 import app.cash.turbine.test
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -29,8 +33,23 @@ import org.junit.Test
  * History UDF contract: list projection + repository commands +
  * exactly-once session handoff. JVM-only - rendering stays in the
  * screen layer and is covered by the styled round-trip suites.
+ *
+ * Phase 7: HistoryViewModel now receives QrEngine + DrawListBitmapRenderer
+ * via DI. Tests use no-op fakes so the ViewModel contract is verified
+ * without any rendering infrastructure.
  */
 class HistoryViewModelTest {
+
+    /** No-op engine: ViewModel holds it but never calls it in list/detail flows. */
+    private object FakeQrEngine : QrEngine {
+        override fun generate(content: QrContent, ecc: EccLevel): QrGenerationResult =
+            QrGenerationResult.Failure(
+                com.hjinlabs.sengkode.core.model.QrError.Validation("fake"),
+            )
+    }
+
+    /** No-op renderer: ViewModel holds it but never calls it in list/detail flows. */
+    private object FakeRenderer : DrawListBitmapRenderer()
 
     @Before
     fun setUp() {
@@ -93,10 +112,16 @@ class HistoryViewModelTest {
         isFavorite = favorite,
     )
 
+    private fun viewModel(
+        repo: FakeHistoryRepository = FakeHistoryRepository(),
+        store: RecordingRestoreStore = RecordingRestoreStore(),
+        handle: SavedStateHandle = SavedStateHandle(),
+    ) = HistoryViewModel(repo, store, handle, FakeQrEngine, FakeRenderer)
+
     @Test
     fun `list state projects the repository flow`() = runTest {
         val repo = FakeHistoryRepository()
-        val viewModel = HistoryViewModel(repo, RecordingRestoreStore(), SavedStateHandle())
+        val viewModel = viewModel(repo)
 
         // WhileSubscribed(5000): the upstream only runs while someone
         // collects - exactly what a real screen does.
@@ -113,9 +138,9 @@ class HistoryViewModelTest {
     fun `detail loads by id from saved state`() = runTest {
         val repo = FakeHistoryRepository()
         repo.items.value = listOf(repoItem(7))
-        val viewModel = HistoryViewModel(
-            repo, RecordingRestoreStore(),
-            SavedStateHandle(mapOf(HistoryViewModel.KEY_ITEM_ID to 7L)),
+        val viewModel = viewModel(
+            repo = repo,
+            handle = SavedStateHandle(mapOf(HistoryViewModel.KEY_ITEM_ID to 7L)),
         )
         // Unconfined dispatcher lets the init load complete eagerly.
         assertEquals(7L, viewModel.detail.value?.id)
@@ -123,14 +148,13 @@ class HistoryViewModelTest {
 
     @Test
     fun `detail is null without an id`() = runTest {
-        val viewModel = HistoryViewModel(FakeHistoryRepository(), RecordingRestoreStore(), SavedStateHandle())
-        assertNull(viewModel.detail.value)
+        assertNull(viewModel().detail.value)
     }
 
     @Test
     fun `toggleFavorite inverts the stored flag`() = runTest {
         val repo = FakeHistoryRepository()
-        val viewModel = HistoryViewModel(repo, RecordingRestoreStore(), SavedStateHandle())
+        val viewModel = viewModel(repo = repo)
         viewModel.toggleFavorite(repoItem(3, favorite = false))
         assertEquals(listOf(3L to true), repo.favorites)
         viewModel.toggleFavorite(repoItem(3, favorite = true))
@@ -140,7 +164,7 @@ class HistoryViewModelTest {
     @Test
     fun `delete and clearAll reach the repository`() = runTest {
         val repo = FakeHistoryRepository()
-        val viewModel = HistoryViewModel(repo, RecordingRestoreStore(), SavedStateHandle())
+        val viewModel = viewModel(repo = repo)
         viewModel.delete(repoItem(5))
         assertEquals(listOf(5L), repo.deleted)
         viewModel.deleteCurrentDetail()
@@ -149,9 +173,18 @@ class HistoryViewModelTest {
     }
 
     @Test
+    fun `engine and renderer are the injected instances`() = runTest {
+        val vm = viewModel()
+        // Phase 7 DI contract: ViewModel exposes the injected instances
+        // so screens can use them without constructing infrastructure.
+        assertTrue(vm.engine === FakeQrEngine)
+        assertTrue(vm.renderer === FakeRenderer)
+    }
+
+    @Test
     fun `regenerate hands the snapshot to the studio session once`() = runTest {
         val store = RecordingRestoreStore()
-        val viewModel = HistoryViewModel(FakeHistoryRepository(), store, SavedStateHandle())
+        val viewModel = viewModel(store = store)
         val item = repoItem(9)
         viewModel.regenerate(item)
         viewModel.regenerate(item)

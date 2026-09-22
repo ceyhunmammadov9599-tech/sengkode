@@ -29,6 +29,11 @@ object GeneratorModule {
     fun provideQrBitmapRenderer(): QrBitmapRenderer = QrBitmapRenderer()
 
     @Provides
+    @Singleton
+    fun provideDrawListBitmapRenderer(): com.hjinlabs.sengkode.core.export.DrawListBitmapRenderer =
+        com.hjinlabs.sengkode.core.export.DrawListBitmapRenderer()
+
+    @Provides
     fun provideGenerationDispatcher(): CoroutineDispatcher = Dispatchers.Default
 }
 
