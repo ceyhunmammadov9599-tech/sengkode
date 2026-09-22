@@ -2,20 +2,63 @@
 #
 # Three quality gates run on every push and merge request:
 #
-#   build             → assembleDebug (compilation gate)
-#   test              → all unit tests across every module
+#   build              → assembleDebug  (compilation gate)
+#   test               → all unit tests across every module
 #   release-validation → assembleRelease (R8 + ProGuard gate)
 #
-# Restrictions (privacy-first contract):
+# Privacy-first contract:
 #   - No APK is uploaded or published automatically.
 #   - No deployment to Play Store or any distribution channel.
 #   - No emulator is launched; all tests are JVM / Robolectric.
+#
+# Android SDK strategy (Option B — explicit install):
+#   Base image: eclipse-temurin:17-jdk (stable, official, JDK 17 exact match)
+#   SDK install: sdkmanager in before_script, pinned component versions.
+#   Rationale: avoids dependency on third-party Android images that may
+#   change or disappear; every component version is explicit and auditable.
 
+# ── Default settings applied to every job ──────────────────────────────────────
 default:
   image: "eclipse-temurin:17-jdk"
+
+  # Install the Android SDK before every job.
+  # sdkmanager is part of the command-line tools package; we download
+  # the latest stable cmdline-tools zip, unpack it, then use it to
+  # install the exact SDK components the project requires.
+  before_script:
+    # 1. Install OS dependencies needed to run the Android toolchain.
+    - apt-get update -qq && apt-get install -y -qq wget unzip
+
+    # 2. Download Android command-line tools (stable, version-pinned URL).
+    #    The version below matches the latest stable release at the time
+    #    of writing. Update the URL when a newer stable release is needed.
+    - export CMDLINE_TOOLS_VERSION="11076708"
+    - export ANDROID_SDK_ROOT="/opt/android-sdk"
+    - export ANDROID_HOME="${ANDROID_SDK_ROOT}"
+    - mkdir -p "${ANDROID_SDK_ROOT}/cmdline-tools"
+    - wget -q "https://dl.google.com/android/repository/commandlinetools-linux-${CMDLINE_TOOLS_VERSION}_latest.zip"
+        -O /tmp/cmdline-tools.zip
+    - unzip -q /tmp/cmdline-tools.zip -d /tmp/cmdline-tools-unpack
+    # sdkmanager requires the directory to be named "latest" under cmdline-tools.
+    - mv /tmp/cmdline-tools-unpack/cmdline-tools "${ANDROID_SDK_ROOT}/cmdline-tools/latest"
+    - rm /tmp/cmdline-tools.zip
+
+    # 3. Add sdkmanager and platform-tools to PATH.
+    - export PATH="${ANDROID_SDK_ROOT}/cmdline-tools/latest/bin:${ANDROID_SDK_ROOT}/platform-tools:${PATH}"
+
+    # 4. Accept all SDK licenses non-interactively.
+    - yes | sdkmanager --licenses > /dev/null 2>&1 || true
+
+    # 5. Install the exact SDK components the project requires.
+    #    compileSdk = 34, AGP 8.5.0 defaults to build-tools 34.0.0.
+    - sdkmanager --install
+        "platform-tools"
+        "platforms;android-34"
+        "build-tools;34.0.0"
+
   # Restore the Gradle home cache between jobs and pipelines.
-  # The key includes the version catalog so a dependency change
-  # invalidates the cache automatically.
+  # Key includes the version catalog and wrapper properties so a
+  # dependency change or wrapper upgrade busts the cache automatically.
   cache:
     key:
       files:
@@ -25,19 +68,18 @@ default:
       - .gradle/
       - ~/.gradle/caches/
       - ~/.gradle/wrapper/
+      # Cache the downloaded SDK components to avoid re-downloading
+      # on every pipeline run when the cache key has not changed.
+      - /opt/android-sdk/
     policy: pull-push
 
-# ── Global settings ────────────────────────────────────────────────────────────
+# ── Global variables ──────────────────────────────────────────────────────────────
 variables:
   # Gradle daemon is useless inside ephemeral CI containers.
   GRADLE_OPTS: "-Dorg.gradle.daemon=false -Dorg.gradle.parallel=true -Dorg.gradle.caching=true"
-  # Android SDK is pre-installed on the runner via the android image below;
-  # override the path if your runner uses a different location.
-  ANDROID_SDK_ROOT: "/android-sdk"
-
-# Use the official Android + JDK 17 image for all jobs.
-# eclipse-temurin:17-jdk is the base; the android layer adds the SDK.
-image: "eclipse-temurin:17-jdk"
+  # Canonical SDK location used by Gradle Android plugin.
+  ANDROID_SDK_ROOT: "/opt/android-sdk"
+  ANDROID_HOME: "/opt/android-sdk"
 
 stages:
   - build
@@ -55,7 +97,7 @@ assemble-debug:
     when: always
     expire_in: 7 days
     paths:
-      # Build reports (not the APK itself — no automatic distribution).
+      # Build reports only — the APK is not uploaded or distributed.
       - "**/build/reports/"
   rules:
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
@@ -68,9 +110,8 @@ unit-tests:
   needs: ["assemble-debug"]
   script:
     - chmod +x gradlew
-    # Run every :module:test task across the project.
-    # --continue ensures all modules report before the job fails,
-    # so the artifact upload captures every test report.
+    # --continue: collect all module reports before failing the job,
+    # so the JUnit artifact is always complete even on partial failure.
     - ./gradlew test --continue --stacktrace
   artifacts:
     name: "test-reports-${CI_COMMIT_SHORT_SHA}"
@@ -93,20 +134,26 @@ assemble-release:
   needs: ["unit-tests"]
   script:
     - chmod +x gradlew
-    # assembleRelease runs R8 full-mode minification with the ProGuard
-    # rules added in Phase 5. A failure here means a keep rule is missing
-    # or a dependency was stripped. The APK is NOT uploaded anywhere.
+    # assembleRelease runs R8 full-mode minification with the Phase 5
+    # ProGuard rules. A failure here means a keep rule is missing or a
+    # class was stripped. The APK is NOT uploaded anywhere.
+    #
+    # Signing: app/build.gradle.kts reads keystore.properties from the
+    # repo root. If the file is absent (as it will be in CI without
+    # secrets configured), the build completes unsigned. This is
+    # intentional for the validation gate — R8 correctness is verified
+    # regardless of signing status.
     - ./gradlew assembleRelease --stacktrace
   artifacts:
     name: "release-build-reports-${CI_COMMIT_SHORT_SHA}"
     when: always
     expire_in: 7 days
     paths:
-      # Build reports only — the APK itself is excluded intentionally.
+      # Build reports and R8 mapping only — APK excluded intentionally.
       - "**/build/reports/"
       - "app/build/outputs/mapping/"
   rules:
-    # Release validation runs on main and release branches only.
-    # It is skipped on feature branches to keep MR pipelines fast.
+    # Release validation runs on main and release/* branches only.
+    # Skipped on feature branches to keep MR pipelines fast.
     - if: '$CI_COMMIT_BRANCH == "main"'
     - if: '$CI_COMMIT_BRANCH =~ /^release\//'
